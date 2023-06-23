@@ -1,73 +1,99 @@
-# BY Smoodie (1.0)
+# BY Smoodie (2.0)
 
-import subprocess
 import os
+import subprocess
+import logging
+import tkinter as tk
+from tkinter import filedialog, simpledialog, messagebox
 
-from tkinter import *
-from tkinter import filedialog, simpledialog
-import tkinter.messagebox as mbox
 
-root = Tk()
+def get_drives():
+    """
+    Get the list of available drives
+    """
+    try:
+        output = subprocess.check_output(['wmic', 'logicaldisk', 'get', 'caption'])
+        output = output.decode('utf-8').split('\r\r\n')[1:-1]
+        return [drive.strip() for drive in output]
+    except Exception as e:
+        logging.error(f"Error in get_drives(): {str(e)}")
+        return []
 
-def select_drive():
-    drives = []
-    output = subprocess.check_output(['wmic', 'logicaldisk', 'get', 'caption'])
-    output = output.decode('utf-8').split('\r\r\n')[1:-1]
-    for drive in output:
-        drives.append(drive.strip())
-    drive = simpledialog.askstring("Select Drive", "Select the drive to fix", parent=root, 
-                                   initialvalue=drives[0], 
-                                   selectbackground='lightblue', selectforeground='black', 
-                                   show='*')
-    if drive:
-        fix_drive(drive)
 
-def fix_drive(drive):
-    infected_drives = []
-    drive_type = subprocess.check_output(['wmic', 'logicaldisk', 'where', f"name='{drive}'", 'get', 'drivetype']).decode('utf-8').split()[1]
-    if drive_type == '2': # Verify if is an USB
+def is_removable(drive):
+    """
+    Check if the drive is removable
+    """
+    try:
+        drive_type = subprocess.check_output(['wmic', 'logicaldisk', 'where', f"name='{drive}'", 'get', 'drivetype']).decode('utf-8').split()[1]
+        return drive_type == '2'
+    except Exception as e:
+        logging.error(f"Error in is_removable(): {str(e)}")
+        return False
+
+
+def remove_shortcut_virus(drive):
+    """
+    Remove the shortcut virus from the given drive
+    """
+    try:
         for entry in os.scandir(drive):
             if entry.is_file() and entry.name.lower().endswith('.lnk'):
-                mbox.showinfo("Information", f"{drive} is infected. The program will try to clean it.")
-                os.system(f'attrib -h -r -s /s /d "{entry.path}"') # Del hidden attribut
+                logging.info(f"{drive} is infected. Attempting to clean...")
+                os.system(f'attrib -h -r -s /s /d "{entry.path}"')  # Remove hidden attribute
+                
                 try:
                     os.remove(os.path.join(drive, "autorun.inf"))
-                except Exception:
-                    print("Error while removing 'autorun.inf'.")
-                subprocess.call(['chkdsk', drive, '/f']) # Use chdsk
-                # Del .lnk files
+                except Exception as e:
+                    logging.warning("Error while removing 'autorun.inf'.")
+                
+                # Run chkdsk
+                subprocess.call(['chkdsk', drive, '/f'])
+
+                # Delete .lnk files
                 for file in os.listdir(drive):
                     if file.endswith(".lnk"):
                         os.remove(os.path.join(drive, file))
                     if file.lower() == 'system volume information':
                         folder_path = os.path.join(drive, file)
                         subprocess.call(['attrib', '+h', folder_path])
-                    
-                
-        else: # Not infected
-            mbox.showinfo("Information", "The peripheral isn't infected.")
-            return
-    else:
-        mbox.showinfo("Error", f"{drive} isn't a removable drive!")
-        return
-        
-    mbox.showinfo("Information", "The infected peripheral has been repaired succesfully.")
+                return True
+        logging.info("The peripheral isn't infected.")
+        return False
+    except Exception as e:
+        logging.error(f"Error in remove_shortcut_virus(): {str(e)}")
+        return False
 
 
-root.geometry("300x150")
-root.title("Shortcut Antivirus")
+def main():
+    # Configure logging
+    logging.basicConfig(filename='antivirus.log', level=logging.INFO)
 
-drives = []
-output = subprocess.check_output(['wmic', 'logicaldisk', 'get', 'caption'])
-output = output.decode('utf-8').split('\r\r\n')[1:-1]
-for drive in output:
-    drives.append(drive.strip())
+    # GUI
+    root = tk.Tk()
+    root.geometry("300x150")
+    root.title("Shortcut Antivirus")
 
-drive_var = StringVar(value=drives[0])
-drive_select = OptionMenu(root, drive_var, *drives)
-drive_select.pack(pady=16)
+    def on_fix_drive():
+        selected_drive = drive_var.get()
+        if is_removable(selected_drive):
+            if remove_shortcut_virus(selected_drive):
+                messagebox.showinfo("Information", "The infected peripheral has been repaired successfully.")
+            else:
+                messagebox.showinfo("Information", "The peripheral isn't infected.")
+        else:
+            messagebox.showinfo("Error", f"{selected_drive} isn't a removable drive!")
 
-fix_button = Button(root, text="Fix drive", width=15, command=lambda: fix_drive(drive_var.get()))
-fix_button.pack(pady=10)
+    drives = get_drives()
+    drive_var = tk.StringVar(value=drives[0])
+    drive_select = tk.OptionMenu(root, drive_var, *drives)
+    drive_select.pack(pady=16)
 
-root.mainloop()
+    fix_button = tk.Button(root, text="Fix drive", width=15, command=on_fix_drive)
+    fix_button.pack(pady=10)
+
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
