@@ -18,6 +18,7 @@ Shortcut Antivirus is a Python application designed to detect and remove the inf
 Python 3.x installed. (3.11+ recommended)
 
 ## ⚙️ Installation & Usage
+
 **Download ZIP directly:**
 
 Code > Download ZIP
@@ -35,6 +36,8 @@ python main.py
 
 The application window will open. Select the target drive from the drop-down menu and click the Fix drive button to start the cleaning process.
 Check the antivirus.log file for logs and errors.
+
+NOTE: you can turn the .pyw to .py for better troubleshooting (console errors).
 
 ## 📝 License
 
