@@ -1,14 +1,12 @@
-# By Smoodie (3.0)
-# TODO: Multi Threading, MacOS better compatibility
-
 import os
 import subprocess
+import threading
 import logging
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
 import platform
 import re
-
+import queue
 
 def get_drives():
     """
@@ -70,7 +68,7 @@ def is_removable(drive):
         return False
 
 
-def remove_shortcut_virus(drive):
+def remove_shortcut_virus(drive, progress_queue):
     """
     Remove the shortcut virus from the given drive
     """
@@ -111,11 +109,40 @@ def remove_shortcut_virus(drive):
         else:
             logging.info(f"The peripheral isn't infected.")
         
-        return infected
+        progress_queue.put((drive, infected))
 
     except Exception as e:
         logging.error(f"Error in remove_shortcut_virus(): {str(e)}")
-        return False
+        progress_queue.put((drive, False))
+
+
+def on_fix_drive():
+    selected_drive = drive_var.get()
+    if selected_drive:
+        if is_removable(selected_drive):
+            if remove_shortcut_virus_thread.is_alive():
+                messagebox.showinfo("Information", "Virus cleaning process is already in progress.")
+            else:
+                progress_label.config(text="Scanning and cleaning in progress...")
+                state_label.config(text="")
+                remove_shortcut_virus_thread = threading.Thread(target=remove_shortcut_virus, args=(selected_drive, progress_queue))
+                remove_shortcut_virus_thread.start()
+        else:
+            messagebox.showinfo("Error", f"{selected_drive} isn't a removable drive!")
+    else:
+        messagebox.showinfo("Error", "No drive selected!")
+
+
+def update_progress():
+    try:
+        drive, infected = progress_queue.get(0)
+        if infected:
+            state_label.config(text=f"The infected peripheral {drive} has been repaired successfully.")
+        else:
+            state_label.config(text=f"The peripheral {drive} isn't infected.")
+        progress_label.config(text="")
+    except queue.Empty:
+        root.after(100, update_progress)
 
 
 def main():
@@ -127,31 +154,29 @@ def main():
     root.geometry("300x150")
     root.title("Shortcut Antivirus")
 
-    def on_fix_drive():
-        selected_drive = drive_var.get()
-        if selected_drive:
-            if is_removable(selected_drive):
-                if remove_shortcut_virus(selected_drive):
-                    messagebox.showinfo("Information", "The infected peripheral has been repaired successfully.")
-                else:
-                    messagebox.showinfo("Information", "The peripheral isn't infected.")
-            else:
-                messagebox.showinfo("Error", f"{selected_drive} isn't a removable drive!")
-        else:
-            messagebox.showinfo("Error", "No drive selected!")
-
     drives = get_drives()
     drive_var = tk.StringVar()
     if drives:
         drive_var.set(drives[0])
     else:
         messagebox.showinfo("Error", "No drives detected!")
+        return
     drive_select = tk.OptionMenu(root, drive_var, *drives)
     drive_select.pack(pady=16)
 
     fix_button = tk.Button(root, text="Fix drive", width=15, command=on_fix_drive)
     fix_button.pack(pady=10)
 
+    progress_label = tk.Label(root, text="", anchor="w")
+    progress_label.pack(fill=tk.X, pady=10)
+
+    state_label = tk.Label(root, text="", anchor="w")
+    state_label.pack(fill=tk.X, pady=5)
+
+    progress_queue = queue.Queue()
+    remove_shortcut_virus_thread = threading.Thread(target=lambda: None)  # Dummy thread initially
+
+    root.after(100, update_progress)
     root.mainloop()
 
 
