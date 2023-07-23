@@ -1,3 +1,5 @@
+# By Smoodie (4.0)
+
 import os
 import subprocess
 import threading
