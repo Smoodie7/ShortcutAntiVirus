@@ -1,3 +1,5 @@
+**This project was initially created to treat a spreading virus in the USB keys of my high school.**
+
 # Shortcut Antivirus (Version 3.0)
 
 Shortcut Antivirus is a Python application designed to detect and remove the infamous Shortcut Virus from removable drives (e.g., USB drives). It's a really simple tool (with a GUI) that allows you to select the target drive and initiate the cleaning process with a single click.
